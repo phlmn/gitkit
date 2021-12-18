@@ -2,6 +2,7 @@ package gitkit
 
 import (
 	"fmt"
+	"path"
 	"regexp"
 	"strings"
 )
@@ -20,10 +21,14 @@ func ParseGitCommand(cmd string) (*GitCommand, error) {
 		return nil, fmt.Errorf("invalid git command")
 	}
 
+	// prevent path traversal
+	safeRepo := path.Clean(path.Join("/", matches[0][2]))
+	safeRepo = strings.TrimPrefix(safeRepo, "/")
+
 	result := &GitCommand{
 		Original: cmd,
 		Command:  matches[0][1],
-		Repo:     strings.Replace(matches[0][2], "/", "", 1),
+		Repo:     safeRepo,
 	}
 
 	return result, nil
