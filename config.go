@@ -61,8 +61,8 @@ func (c *HookScripts) setupInDir(path string) error {
 	return nil
 }
 
-func (c *Config) KeyPath() string {
-	return filepath.Join(c.KeyDir, "gitkit.rsa")
+func (c *Config) KeyPath(keyType string) string {
+	return filepath.Join(c.KeyDir, "gitkit"+"."+keyType)
 }
 
 func (c *Config) Setup() error {

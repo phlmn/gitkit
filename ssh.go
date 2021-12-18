@@ -2,6 +2,7 @@ package gitkit
 
 import (
 	"bytes"
+	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -38,7 +39,7 @@ type SSH struct {
 	sshconfig           *ssh.ServerConfig
 	config              *Config
 	PublicKeyLookupFunc func(string) (*PublicKey, error)
-	Authorize           *func(string, string) bool
+	Authorize           func(string, string) bool
 }
 
 func NewSSH(config Config) *SSH {
@@ -139,7 +140,7 @@ func (s *SSH) handleConnection(keyID string, chans <-chan ssh.NewChannel) {
 					}
 
 					if s.Authorize != nil {
-						authorized := (*s.Authorize)(gitcmd.Repo, keyID)
+						authorized := s.Authorize(keyID, gitcmd.Repo)
 						if !authorized {
 							log.Printf("ssh: key with ID '%s' not authorized for repo '%s'", keyID, gitcmd.Repo)
 							return
@@ -204,35 +205,38 @@ func (s *SSH) handleConnection(keyID string, chans <-chan ssh.NewChannel) {
 	}
 }
 
-func (s *SSH) createServerKey() error {
+func (s *SSH) storeKey(keyType string, privateKey interface{}, publicKey interface{}) error {
+	keyPath := s.config.KeyPath(keyType)
+
 	if err := os.MkdirAll(s.config.KeyDir, os.ModePerm); err != nil {
 		return err
 	}
 
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	privateKeyFile, err := os.Create(keyPath)
 	if err != nil {
 		return err
 	}
 
-	privateKeyFile, err := os.Create(s.config.KeyPath())
-	if err != nil {
-		return err
-	}
-
-	if err := os.Chmod(s.config.KeyPath(), 0600); err != nil {
+	if err := os.Chmod(keyPath, 0600); err != nil {
 		return err
 	}
 	defer privateKeyFile.Close()
 	if err != nil {
 		return err
 	}
-	privateKeyPEM := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privateKey)}
+
+	bytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return err
+	}
+
+	privateKeyPEM := &pem.Block{Type: fmt.Sprintf("PRIVATE KEY"), Bytes: bytes}
 	if err := pem.Encode(privateKeyFile, privateKeyPEM); err != nil {
 		return err
 	}
 
-	pubKeyPath := s.config.KeyPath() + ".pub"
-	pub, err := ssh.NewPublicKey(&privateKey.PublicKey)
+	pubKeyPath := keyPath + ".pub"
+	pub, err := ssh.NewPublicKey(publicKey)
 	if err != nil {
 		return err
 	}
@@ -269,25 +273,56 @@ func (s *SSH) setup() error {
 		}
 	}
 
-	keypath := s.config.KeyPath()
-	if !fileExists(keypath) {
-		if err := s.createServerKey(); err != nil {
+	if !fileExists(s.config.KeyPath("rsa")) {
+		rsaPrivateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			return err
+		}
+
+		if err := s.storeKey("rsa", rsaPrivateKey, &rsaPrivateKey.PublicKey); err != nil {
 			return err
 		}
 	}
 
-	privateBytes, err := ioutil.ReadFile(keypath)
-	if err != nil {
+	if !fileExists(s.config.KeyPath("ed25519")) {
+		ed25519PublicKey, ed25519PrivateKey, err := ed25519.GenerateKey(rand.Reader)
+		if err != nil {
+			return err
+		}
+		if err := s.storeKey("ed25519", ed25519PrivateKey, ed25519PublicKey); err != nil {
+			return err
+		}
+	}
+
+	if err := addHostKeyFromFile(config, s.config.KeyPath("rsa")); err != nil {
 		return err
 	}
 
-	private, err := ssh.ParsePrivateKey(privateBytes)
-	if err != nil {
+	if err := addHostKeyFromFile(config, s.config.KeyPath("ed25519")); err != nil {
 		return err
 	}
 
-	config.AddHostKey(private)
 	s.sshconfig = config
+	return nil
+}
+
+func addHostKeyFromFile(c *ssh.ServerConfig, keyPath string) error {
+	privateBytes, err := ioutil.ReadFile(keyPath)
+	if err != nil {
+		return err
+	}
+
+	key, err := ssh.ParseRawPrivateKey(privateBytes)
+	if err != nil {
+		return err
+	}
+
+	private, err := ssh.NewSignerFromKey(key)
+	if err != nil {
+		return err
+	}
+
+	c.AddHostKey(private)
 	return nil
 }
 
