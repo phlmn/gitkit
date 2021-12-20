@@ -205,10 +205,8 @@ func (s *SSH) handleConnection(keyID string, chans <-chan ssh.NewChannel) {
 	}
 }
 
-func (s *SSH) storeKey(keyType string, privateKey interface{}, publicKey interface{}) error {
-	keyPath := s.config.KeyPath(keyType)
-
-	if err := os.MkdirAll(s.config.KeyDir, os.ModePerm); err != nil {
+func storeKey(keyPath string, privateKey interface{}, publicKey interface{}) error {
+	if err := os.MkdirAll(filepath.Dir(keyPath), os.ModePerm); err != nil {
 		return err
 	}
 
@@ -273,25 +271,12 @@ func (s *SSH) setup() error {
 		}
 	}
 
-	if !fileExists(s.config.KeyPath("rsa")) {
-		rsaPrivateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-		if err != nil {
-			return err
-		}
-
-		if err := s.storeKey("rsa", rsaPrivateKey, &rsaPrivateKey.PublicKey); err != nil {
-			return err
-		}
+	if err := genRsaKey(s.config.KeyPath("rsa")); err != nil {
+		return err
 	}
 
-	if !fileExists(s.config.KeyPath("ed25519")) {
-		ed25519PublicKey, ed25519PrivateKey, err := ed25519.GenerateKey(rand.Reader)
-		if err != nil {
-			return err
-		}
-		if err := s.storeKey("ed25519", ed25519PrivateKey, ed25519PublicKey); err != nil {
-			return err
-		}
+	if err := genEd25519Key(s.config.KeyPath("ed25519")); err != nil {
+		return err
 	}
 
 	if err := addHostKeyFromFile(config, s.config.KeyPath("rsa")); err != nil {
@@ -303,6 +288,38 @@ func (s *SSH) setup() error {
 	}
 
 	s.sshconfig = config
+	return nil
+}
+
+func genRsaKey(path string) error {
+	if !fileExists(path) {
+		rsaPrivateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			return err
+		}
+
+		if err := storeKey(path, rsaPrivateKey, &rsaPrivateKey.PublicKey); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func genEd25519Key(path string) error {
+	if fileExists(path) {
+		return nil
+	}
+
+	ed25519PublicKey, ed25519PrivateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return err
+	}
+
+	if err := storeKey(path, ed25519PrivateKey, ed25519PublicKey); err != nil {
+		return err
+	}
+
 	return nil
 }
 
