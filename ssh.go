@@ -39,7 +39,7 @@ type SSH struct {
 	sshconfig           *ssh.ServerConfig
 	config              *Config
 	PublicKeyLookupFunc func(string) (*PublicKey, error)
-	Authorize           func(string, string) bool
+	Authorize           func(string, string) (bool, error)
 }
 
 func NewSSH(config Config) *SSH {
@@ -140,7 +140,11 @@ func (s *SSH) handleConnection(keyID string, chans <-chan ssh.NewChannel) {
 					}
 
 					if s.Authorize != nil {
-						authorized := s.Authorize(keyID, gitcmd.Repo)
+						authorized, err := s.Authorize(keyID, gitcmd.Repo)
+						if err != nil {
+							log.Printf("ssh: Authorization failed: %s", err)
+							return
+						}
 						if !authorized {
 							log.Printf("ssh: key with ID '%s' not authorized for repo '%s'", keyID, gitcmd.Repo)
 							return
