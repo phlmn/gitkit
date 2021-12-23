@@ -151,8 +151,8 @@ func (s *SSH) handleConnection(keyID string, chans <-chan ssh.NewChannel) {
 						}
 					}
 
-					if !repoExists(filepath.Join(s.config.Dir, gitcmd.Repo)) && s.config.AutoCreate == true {
-						err := initRepo(gitcmd.Repo, s.config)
+					if !RepoExists(filepath.Join(s.config.Dir, gitcmd.Repo)) && s.config.AutoCreate == true {
+						err := InitRepo(gitcmd.Repo, s.config)
 						if err != nil {
 							logError("repo-init", err)
 							return

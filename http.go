@@ -115,14 +115,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if !repoExists(req.RepoPath) && s.config.AutoCreate == true {
-		err := initRepo(req.RepoName, &s.config)
+	if !RepoExists(req.RepoPath) && s.config.AutoCreate == true {
+		err := InitRepo(req.RepoName, &s.config)
 		if err != nil {
 			logError("repo-init", err)
 		}
 	}
 
-	if !repoExists(req.RepoPath) {
+	if !RepoExists(req.RepoPath) {
 		logError("repo-init", fmt.Errorf("%s does not exist", req.RepoPath))
 		http.NotFound(w, r)
 		return
@@ -220,25 +220,6 @@ func (s *Server) postRPC(rpc string, w http.ResponseWriter, r *Request) {
 
 func (s *Server) Setup() error {
 	return s.config.Setup()
-}
-
-func initRepo(name string, config *Config) error {
-	fullPath := path.Join(config.Dir, name)
-
-	if err := exec.Command(config.GitPath, "init", "--bare", fullPath).Run(); err != nil {
-		return err
-	}
-
-	if config.AutoHooks && config.Hooks != nil {
-		return config.Hooks.setupInDir(fullPath)
-	}
-
-	return nil
-}
-
-func repoExists(p string) bool {
-	_, err := os.Stat(path.Join(p, "objects"))
-	return err == nil
 }
 
 func gitCommand(name string, args ...string) (*exec.Cmd, io.Reader) {
