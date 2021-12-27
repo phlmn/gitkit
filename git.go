@@ -1,9 +1,9 @@
 package gitkit
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -12,12 +12,12 @@ import (
 func InitRepo(name string, config *Config) error {
 	fullPath := path.Join(config.Dir, name)
 
-	var stderr string
 	cmd := exec.Command(config.GitPath, "init", "--bare", fullPath)
-	cmd.Stderr = bytes.NewBufferString(stderr)
+	stderr, _ := cmd.StdoutPipe()
+	stderrStr, _ := io.ReadAll(stderr)
 
 	if err := cmd.Run(); err != nil {
-		return errors.New(fmt.Sprintf("%s: %s", err, stderr))
+		return errors.New(fmt.Sprintf("%s: %s", err, stderrStr))
 	}
 
 	if config.AutoHooks && config.Hooks != nil {
@@ -30,12 +30,12 @@ func InitRepo(name string, config *Config) error {
 func CloneRepo(name string, config *Config, url string) error {
 	fullPath := path.Join(config.Dir, name)
 
-	var stderr string
 	cmd := exec.Command(config.GitPath, "clone", "--bare", url, fullPath)
-	cmd.Stderr = bytes.NewBufferString(stderr)
+	stderr, _ := cmd.StdoutPipe()
+	stderrStr, _ := io.ReadAll(stderr)
 
 	if err := cmd.Run(); err != nil {
-		return errors.New(fmt.Sprintf("%s: %s", err, stderr))
+		return errors.New(fmt.Sprintf("%s: %s", err, stderrStr))
 	}
 
 	if config.AutoHooks && config.Hooks != nil {
