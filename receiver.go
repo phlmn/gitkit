@@ -15,7 +15,7 @@ const ZeroSHA = "0000000000000000000000000000000000000000"
 
 type Receiver struct {
 	Debug       bool
-	MasterOnly  bool
+	MainOnly    bool
 	TmpDir      string
 	HandlerFunc func(*HookInfo, string) error
 }
@@ -51,8 +51,8 @@ func (r *Receiver) Handle(reader io.Reader) error {
 		return err
 	}
 
-	if r.MasterOnly && hook.Ref != "refs/heads/master" {
-		return fmt.Errorf("cant push to non-master branch")
+	if r.MainOnly && hook.Ref != "refs/heads/main" {
+		return fmt.Errorf("cant push to non-main branch")
 	}
 
 	id, err := uuid.NewV4()

@@ -12,7 +12,7 @@ import (
 func InitRepo(name string, config *Config) error {
 	fullPath := path.Join(config.Dir, name)
 
-	cmd := exec.Command(config.GitPath, "init", "--bare", fullPath)
+	cmd := exec.Command(config.GitPath, "init", "--bare", "--initial-branch=main", fullPath)
 	stderr, _ := cmd.StdoutPipe()
 	stderrStr, _ := io.ReadAll(stderr)
 
