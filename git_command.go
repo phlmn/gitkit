@@ -28,7 +28,7 @@ func ParseGitCommand(cmd string) (*GitCommand, error) {
 	result := &GitCommand{
 		Original: cmd,
 		Command:  matches[0][1],
-		Repo:     safeRepo,
+		Repo:     strings.TrimSuffix(safeRepo, ".git"),
 	}
 
 	return result, nil
