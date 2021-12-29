@@ -25,10 +25,15 @@ func ParseGitCommand(cmd string) (*GitCommand, error) {
 	safeRepo := path.Clean(path.Join("/", matches[0][2]))
 	safeRepo = strings.TrimPrefix(safeRepo, "/")
 
+	// allow to leave out the .git suffix in remote
+	if !strings.HasSuffix(safeRepo, ".git") {
+		safeRepo = safeRepo + ".git"
+	}
+
 	result := &GitCommand{
 		Original: cmd,
 		Command:  matches[0][1],
-		Repo:     strings.TrimSuffix(safeRepo, ".git"),
+		Repo:     safeRepo,
 	}
 
 	return result, nil

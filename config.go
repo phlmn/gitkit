@@ -1,9 +1,11 @@
 package gitkit
 
 import (
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Config struct {
@@ -80,21 +82,20 @@ func (c *Config) Setup() error {
 }
 
 func (c *Config) setupHooks() error {
-	files, err := ioutil.ReadDir(c.Dir)
-	if err != nil {
-		return err
-	}
-
-	for _, file := range files {
-		if !file.IsDir() {
-			continue
-		}
-
-		path := filepath.Join(c.Dir, file.Name())
-
-		if err := c.Hooks.setupInDir(path); err != nil {
+	walk := func(s string, d fs.DirEntry, err error) error {
+		if err != nil {
 			return err
 		}
+		if d.IsDir() && strings.HasSuffix(d.Name(), ".git") {
+			if err := c.Hooks.setupInDir(s); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	if err := filepath.WalkDir(c.Dir, walk); err != nil {
+		return err
 	}
 
 	return nil
