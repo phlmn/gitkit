@@ -140,7 +140,7 @@ func (s *SSH) handleConnection(keyID string, chans <-chan ssh.NewChannel) {
 					}
 
 					if s.Authorize != nil {
-						authorized, err := s.Authorize(keyID, gitcmd.Repo)
+						authorized, err := s.Authorize(keyID, strings.TrimSuffix(gitcmd.Repo, ".git"))
 						if err != nil {
 							log.Printf("ssh: Authorization failed: %s", err)
 							return
